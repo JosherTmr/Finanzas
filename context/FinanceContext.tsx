@@ -1,14 +1,17 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { Transaction, TransactionStatusMap, MonthlySummary } from '../types';
+import { Transaction, TransactionStatusMap, MonthlySummary, UserConfig } from '../types';
 
 interface FinanceContextType {
   transactions: Transaction[];
   statusMap: TransactionStatusMap;
+  userConfig: UserConfig;
   addTransaction: (t: Transaction) => void;
   updateTransaction: (t: Transaction) => void;
   deleteTransaction: (id: string) => void;
+  splitTransaction: (original: Transaction, updated: Transaction, splitDate: Date) => void;
   toggleStatus: (transactionId: string, monthKey: string) => void;
   getStatus: (transactionId: string, monthKey: string) => boolean;
+  updateUserConfig: (config: UserConfig) => void;
   selectedYear: number;
   setSelectedYear: (year: number) => void;
   selectedMonth: number; // 0-11
@@ -28,6 +31,12 @@ const INITIAL_DATA: Transaction[] = [
   { id: '6', title: 'Plan Celular', amount: 21000, type: 'expense', category: 'utilities', recurrence: 'permanent', startDate: '2024-01-01', createdAt: Date.now() },
 ];
 
+const INITIAL_CONFIG: UserConfig = {
+  monthlyIncome: 0,
+  workDaysPerWeek: 5,
+  workHoursPerDay: 8
+};
+
 export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('transactions');
@@ -37,6 +46,11 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [statusMap, setStatusMap] = useState<TransactionStatusMap>(() => {
     const saved = localStorage.getItem('statusMap');
     return saved ? JSON.parse(saved) : {};
+  });
+
+  const [userConfig, setUserConfig] = useState<UserConfig>(() => {
+    const saved = localStorage.getItem('userConfig');
+    return saved ? JSON.parse(saved) : INITIAL_CONFIG;
   });
 
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -50,6 +64,10 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     localStorage.setItem('statusMap', JSON.stringify(statusMap));
   }, [statusMap]);
 
+  useEffect(() => {
+    localStorage.setItem('userConfig', JSON.stringify(userConfig));
+  }, [userConfig]);
+
   const addTransaction = (t: Transaction) => {
     setTransactions(prev => [...prev, t]);
   };
@@ -60,6 +78,59 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const deleteTransaction = (id: string) => {
     setTransactions(prev => prev.filter(t => t.id !== id));
+  };
+
+  const updateUserConfig = (config: UserConfig) => {
+    setUserConfig(config);
+  };
+
+  // Logic to handle historic editing
+  const splitTransaction = (original: Transaction, updated: Transaction, splitDate: Date) => {
+    const originalStart = new Date(original.startDate);
+    // Normalize time to midnight to compare just dates safely
+    originalStart.setHours(0, 0, 0, 0);
+    const split = new Date(splitDate);
+    split.setHours(0, 0, 0, 0);
+
+    // If original started BEFORE the split date, we must split history
+    if (originalStart < split) {
+      // 1. Cap the old transaction
+      const prevDate = new Date(split);
+      prevDate.setDate(prevDate.getDate() - 1);
+      
+      // Handle timezone offset for YYYY-MM-DD string
+      const offset = prevDate.getTimezoneOffset();
+      const localPrevDate = new Date(prevDate.getTime() - (offset * 60 * 1000));
+      const endDateStr = localPrevDate.toISOString().split('T')[0];
+
+      const oldVersion: Transaction = {
+        ...original,
+        recurrence: 'monthly-range',
+        endDate: endDateStr
+      };
+
+      // 2. Create the new transaction starting from splitDate
+      // Ensure splitDate string is correct in local time
+      const offsetSplit = split.getTimezoneOffset();
+      const localSplitDate = new Date(split.getTime() - (offsetSplit * 60 * 1000));
+      const startDateStr = localSplitDate.toISOString().split('T')[0];
+
+      const newVersion: Transaction = {
+        ...updated,
+        id: crypto.randomUUID(), // New ID implies fresh start for stats tracking
+        startDate: startDateStr,
+        createdAt: Date.now()
+      };
+
+      setTransactions(prev => {
+        // Remove original, add oldVersion (capped) and newVersion (started now)
+        return [...prev.filter(t => t.id !== original.id), oldVersion, newVersion];
+      });
+
+    } else {
+      // If original started this month or later, just update normally
+      updateTransaction(updated);
+    }
   };
 
   const toggleStatus = (transactionId: string, monthKey: string) => {
@@ -132,11 +203,14 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     <FinanceContext.Provider value={{
       transactions,
       statusMap,
+      userConfig,
       addTransaction,
       updateTransaction,
       deleteTransaction,
+      splitTransaction,
       toggleStatus,
       getStatus,
+      updateUserConfig,
       selectedYear,
       setSelectedYear,
       selectedMonth,

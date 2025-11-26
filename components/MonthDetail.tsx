@@ -23,13 +23,20 @@ const MonthDetail: React.FC<Props> = ({ onBack }) => {
     toggleStatus, 
     deleteTransaction,
     addTransaction,
-    updateTransaction 
+    updateTransaction,
+    splitTransaction,
+    userConfig
   } = useFinance();
 
   const [editingItem, setEditingItem] = useState<Transaction | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   const monthKey = `${selectedYear}-${selectedMonth}`;
+
+  // Calculate total monthly work hours based on config
+  const totalMonthlyWorkHours = useMemo(() => {
+     return userConfig.workDaysPerWeek * userConfig.workHoursPerDay * 4;
+  }, [userConfig]);
 
   // Filter and Sort Transactions
   const currentMonthTransactions = useMemo(() => {
@@ -164,7 +171,8 @@ const MonthDetail: React.FC<Props> = ({ onBack }) => {
             currentMonthTransactions.map(t => {
                const isCompleted = getStatus(t.id, monthKey);
                const isIncome = t.type === 'income';
-               const workHours = !isIncome ? calculateWorkHours(t.amount, summary.income) : null;
+               // Use calculated work hours from config
+               const workHours = !isIncome ? calculateWorkHours(t.amount, summary.income, totalMonthlyWorkHours) : null;
                const installment = getInstallmentInfo(t);
 
                return (
@@ -203,11 +211,11 @@ const MonthDetail: React.FC<Props> = ({ onBack }) => {
                             <span className={`font-bold whitespace-nowrap block ${isIncome ? 'text-income' : 'text-textMain'}`}>
                                 {isIncome ? '+' : '-'}{formatCurrency(t.amount)}
                             </span>
-                            {/* Feature A: Life Cost Indicator */}
-                            {workHours && !isCompleted && (
+                            {/* Feature A: Life Cost Indicator (ALWAYS SHOWING) */}
+                            {workHours && (
                                 <span className="text-[10px] text-primary/70 font-medium flex items-center justify-end gap-1 mt-0.5">
                                     <Timer size={10} />
-                                    {workHours} de vida
+                                    {workHours} vida
                                 </span>
                             )}
                           </div>
@@ -230,7 +238,7 @@ const MonthDetail: React.FC<Props> = ({ onBack }) => {
                                 <Bookmark size={10} /> Fijo
                              </span>
                           )}
-                          {/* Replaced generic Monthly Range text with badge above, but keeping icon if needed or removing strictly if redundant. Keeping generic icon for context if not showing specific installment logic (fallback) */}
+                          
                           {t.recurrence === 'monthly-range' && !installment && (
                              <span className="flex items-center gap-1 text-[10px] text-secondary">
                                 <CalendarClock size={10} /> Recurrente
@@ -258,9 +266,23 @@ const MonthDetail: React.FC<Props> = ({ onBack }) => {
         <TransactionForm 
           initialData={editingItem || undefined}
           onClose={() => setIsFormOpen(false)}
-          onSave={(t) => {
-            if (editingItem) updateTransaction(t);
-            else addTransaction(t);
+          onSave={(t, isPaidImmediate) => {
+            if (editingItem) {
+              // SPLIT TRANSACTION LOGIC
+              // If editing, use splitTransaction to preserve history if needed
+              const currentViewStart = new Date(selectedYear, selectedMonth, 1);
+              splitTransaction(editingItem, t, currentViewStart);
+            } else {
+              addTransaction(t);
+              // Handle immediate payment if checked
+              if (isPaidImmediate) {
+                const parts = t.startDate.split('-');
+                const y = parts[0];
+                const m = parseInt(parts[1]) - 1; // 0-based index
+                const key = `${y}-${m}`;
+                toggleStatus(t.id, key);
+              }
+            }
           }}
         />
       )}

@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useFinance } from '../context/FinanceContext';
 import { formatCurrency } from '../utils';
-import { ChevronDown, Lock } from 'lucide-react';
+import { ChevronDown, Lock, Settings } from 'lucide-react';
+import SettingsModal from './SettingsModal';
 
 interface Props {
   onSelectMonth: (monthIndex: number) => void;
@@ -14,6 +15,8 @@ const MONTH_NAMES = [
 
 const Home: React.FC<Props> = ({ onSelectMonth }) => {
   const { selectedYear, setSelectedYear, getMonthlySummary } = useFinance();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
   const currentMonthIndex = new Date().getMonth();
   const currentYear = new Date().getFullYear();
 
@@ -21,21 +24,31 @@ const Home: React.FC<Props> = ({ onSelectMonth }) => {
   const months = useMemo(() => Array.from({ length: 12 }, (_, i) => 11 - i), []);
 
   return (
-    <div className="pb-8 px-4 pt-4">
+    <div className="pb-8 px-4 pt-4 relative">
       {/* Header / Year Selector */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-textMain tracking-tight">Mis Finanzas</h1>
-        <div className="relative">
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="appearance-none bg-surface text-primary font-bold py-2 pl-4 pr-10 rounded-xl border border-primary/20 focus:outline-none focus:border-primary shadow-lg shadow-black/20"
+        
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="appearance-none bg-surface text-primary font-bold py-2 pl-4 pr-10 rounded-xl border border-primary/20 focus:outline-none focus:border-primary shadow-lg shadow-black/20"
+            >
+              <option value={2023}>2023</option>
+              <option value={2024}>2024</option>
+              <option value={2025}>2025</option>
+            </select>
+            <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-primary pointer-events-none" />
+          </div>
+
+          <button 
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-2.5 bg-surface text-textMuted rounded-xl border border-white/5 hover:text-primary hover:bg-white/5 transition-colors"
           >
-            <option value={2023}>2023</option>
-            <option value={2024}>2024</option>
-            <option value={2025}>2025</option>
-          </select>
-          <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-primary pointer-events-none" />
+            <Settings size={20} />
+          </button>
         </div>
       </div>
 
@@ -45,20 +58,7 @@ const Home: React.FC<Props> = ({ onSelectMonth }) => {
           const isFuture = selectedYear > currentYear || (selectedYear === currentYear && monthIndex > currentMonthIndex);
           const isCurrent = selectedYear === currentYear && monthIndex === currentMonthIndex;
           const summary = getMonthlySummary(selectedYear, monthIndex);
-          const pending = summary.expenses + summary.debt + summary.savings + summary.balance - summary.income; // Logic check: simpler way -> TotalOut - PaidTotal?
-          // Re-calculate strictly pending for display
-          let paidTotal = 0;
-          let totalOut = summary.expenses + summary.debt + summary.savings;
-          // Note: getMonthlySummary returns execution rate, we can infer pending.
-          // But to be precise let's trust the context summary logic which handles status.
-          // We need pending amount. 
-          // Re-using context logic: paidTotal is internal there. Let's look at getMonthlySummary implementation.
-          // It doesn't return pending amount explicitly, only execution rate. 
-          // Let's modify context OR calculate execution here roughly. 
-          // Actually, let's keep it simple: Balance = Income - Outflow. 
-          // We want "Por pagar" (To Pay). We need that from context or calculate it.
-          // Since we can't easily change context interface without touching file again (I did update it though),
-          // let's assume I updated context to return executionRate. 
+          const totalOut = summary.expenses + summary.debt + summary.savings;
           // Pending = TotalOut * (1 - executionRate/100).
           const pendingAmount = totalOut * (1 - (summary.executionRate / 100));
 
@@ -123,6 +123,10 @@ const Home: React.FC<Props> = ({ onSelectMonth }) => {
           );
         })}
       </div>
+
+      {isSettingsOpen && (
+        <SettingsModal onClose={() => setIsSettingsOpen(false)} />
+      )}
     </div>
   );
 };

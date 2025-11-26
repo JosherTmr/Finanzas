@@ -38,6 +38,12 @@ export interface MonthlySummary {
   executionRate: number; // % of budget/income used
 }
 
+export interface UserConfig {
+  monthlyIncome: number; // Salario base referencia (informativo o fallback)
+  workDaysPerWeek: number;
+  workHoursPerDay: number;
+}
+
 export const CATEGORY_LABELS: Record<Category, string> = {
   housing: 'Vivienda',
   food: 'Alimentación',

@@ -4,7 +4,7 @@ import { X, Check } from 'lucide-react';
 
 interface Props {
   onClose: () => void;
-  onSave: (t: Transaction) => void;
+  onSave: (t: Transaction, isPaid?: boolean) => void;
   initialData?: Transaction;
 }
 
@@ -16,6 +16,9 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
   const [recurrence, setRecurrence] = useState<RecurrenceType>(initialData?.recurrence || 'one-time');
   const [startDate, setStartDate] = useState(initialData?.startDate || new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(initialData?.endDate || '');
+  
+  // New state for immediate payment (only for new entries)
+  const [isPaid, setIsPaid] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +36,7 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
       createdAt: initialData?.createdAt || Date.now(),
     };
 
-    onSave(newTransaction);
+    onSave(newTransaction, isPaid);
     onClose();
   };
 
@@ -175,6 +178,22 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
               <option value="other">Otros</option>
             </select>
           </div>
+
+          {/* Paid Checkbox - Only for new one-time transactions */}
+          {!initialData && recurrence === 'one-time' && (
+             <div 
+               className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5 cursor-pointer hover:bg-white/10 transition-colors"
+               onClick={() => setIsPaid(!isPaid)}
+             >
+                <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${isPaid ? 'bg-primary border-primary' : 'border-textMuted'}`}>
+                   {isPaid && <Check size={16} className="text-background" strokeWidth={3} />}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-textMain">¿Ya fue pagado?</span>
+                  <span className="text-[10px] text-textMuted">Se marcará como completado inmediatamente.</span>
+                </div>
+             </div>
+          )}
 
           <button
             type="submit"

@@ -7,11 +7,13 @@ export const formatCurrency = (amount: number): string => {
   }).format(amount);
 };
 
-export const calculateWorkHours = (amount: number, totalIncome: number): string | null => {
+export const calculateWorkHours = (amount: number, totalIncome: number, customMonthlyHours?: number): string | null => {
   if (!totalIncome || totalIncome <= 0) return null;
   
-  // Standard work month = 160 hours
-  const hourlyRate = totalIncome / 160;
+  // Default to 160 hours (40h week * 4) if no custom config provided
+  const monthlyHours = customMonthlyHours && customMonthlyHours > 0 ? customMonthlyHours : 160;
+  
+  const hourlyRate = totalIncome / monthlyHours;
   const hoursNeeded = amount / hourlyRate;
 
   if (hoursNeeded < 1) {
