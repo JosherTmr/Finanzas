@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Category, RecurrenceType, Transaction, TransactionType } from '../types';
 import { X, Check } from 'lucide-react';
+import { useFinance } from '../context/FinanceContext';
+import { calculateHourlyRate, getWorkTimeMessage } from '../utils/workTimeCalculator';
 
 interface Props {
   onClose: () => void;
@@ -9,6 +11,8 @@ interface Props {
 }
 
 const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
+  const { userConfig, getMonthlyIncomeTransaction } = useFinance();
+
   const [title, setTitle] = useState(initialData?.title || '');
   const [amount, setAmount] = useState(initialData?.amount?.toString() || '');
   const [type, setType] = useState<TransactionType>(initialData?.type || 'expense');
@@ -16,9 +20,31 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
   const [recurrence, setRecurrence] = useState<RecurrenceType>(initialData?.recurrence || 'one-time');
   const [startDate, setStartDate] = useState(initialData?.startDate || new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(initialData?.endDate || '');
-  
+
   // New state for immediate payment (only for new entries)
   const [isPaid, setIsPaid] = useState(false);
+
+  // Calculate work time message for expenses
+  const workTimeMessage = useMemo(() => {
+    if (type !== 'expense' || !amount || parseFloat(amount) <= 0) {
+      return '';
+    }
+
+    const incomeTransaction = getMonthlyIncomeTransaction();
+    const monthlyIncome = incomeTransaction?.amount || 0;
+
+    if (monthlyIncome <= 0) {
+      return '';
+    }
+
+    const hourlyRate = calculateHourlyRate(
+      monthlyIncome,
+      userConfig.workDaysPerWeek,
+      userConfig.workHoursPerDay
+    );
+
+    return getWorkTimeMessage(parseFloat(amount), hourlyRate, userConfig.workHoursPerDay);
+  }, [amount, type, userConfig, getMonthlyIncomeTransaction]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,6 +91,13 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
                 autoFocus
               />
             </div>
+            {workTimeMessage && (
+              <div className="mt-3 bg-primary/10 border border-primary/20 rounded-xl p-3 animate-fade-in">
+                <p className="text-sm text-primary font-medium text-center">
+                  {workTimeMessage}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Title */}
@@ -86,14 +119,13 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
                 key={t}
                 type="button"
                 onClick={() => setType(t)}
-                className={`py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-                  type === t 
-                    ? t === 'income' ? 'bg-income text-background' 
+                className={`py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${type === t
+                  ? t === 'income' ? 'bg-income text-background'
                     : t === 'debt' ? 'bg-expense text-white'
-                    : t === 'savings' ? 'bg-secondary text-white'
-                    : 'bg-white text-background'
-                    : 'text-textMuted hover:text-white'
-                }`}
+                      : t === 'savings' ? 'bg-secondary text-white'
+                        : 'bg-white text-background'
+                  : 'text-textMuted hover:text-white'
+                  }`}
               >
                 {t === 'expense' ? 'Gasto' : t === 'income' ? 'Ingreso' : t === 'debt' ? 'Deuda' : 'Ahorro'}
               </button>
@@ -104,32 +136,32 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
           <div>
             <label className="block text-xs font-bold text-textMuted uppercase tracking-wider mb-2">Frecuencia</label>
             <div className="grid grid-cols-3 gap-2">
-              <button 
-                type="button" 
-                onClick={() => setRecurrence('one-time')} 
+              <button
+                type="button"
+                onClick={() => setRecurrence('one-time')}
                 className={`py-3 px-2 rounded-xl text-xs font-medium border transition-all ${recurrence === 'one-time' ? 'border-primary bg-primary/10 text-primary' : 'border-white/10 bg-background text-textMuted'}`}
               >
                 Único
               </button>
-              <button 
-                type="button" 
-                onClick={() => setRecurrence('monthly-range')} 
+              <button
+                type="button"
+                onClick={() => setRecurrence('monthly-range')}
                 className={`py-3 px-2 rounded-xl text-xs font-medium border transition-all ${recurrence === 'monthly-range' ? 'border-primary bg-primary/10 text-primary' : 'border-white/10 bg-background text-textMuted'}`}
               >
                 Recurrente
               </button>
-              <button 
-                type="button" 
-                onClick={() => setRecurrence('permanent')} 
+              <button
+                type="button"
+                onClick={() => setRecurrence('permanent')}
                 className={`py-3 px-2 rounded-xl text-xs font-medium border transition-all ${recurrence === 'permanent' ? 'border-primary bg-primary/10 text-primary' : 'border-white/10 bg-background text-textMuted'}`}
               >
                 Permanente
               </button>
             </div>
             <p className="text-[10px] text-textMuted mt-2 px-1">
-               {recurrence === 'one-time' && 'Solo aparece en este mes.'}
-               {recurrence === 'monthly-range' && 'Se repite entre una fecha de inicio y fin.'}
-               {recurrence === 'permanent' && 'Aparece en todos los meses del año automáticamente.'}
+              {recurrence === 'one-time' && 'Solo aparece en este mes.'}
+              {recurrence === 'monthly-range' && 'Se repite entre una fecha de inicio y fin.'}
+              {recurrence === 'permanent' && 'Aparece en todos los meses del año automáticamente.'}
             </p>
           </div>
 
@@ -181,18 +213,18 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
 
           {/* Paid Checkbox - Only for new one-time transactions */}
           {!initialData && recurrence === 'one-time' && (
-             <div 
-               className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5 cursor-pointer hover:bg-white/10 transition-colors"
-               onClick={() => setIsPaid(!isPaid)}
-             >
-                <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${isPaid ? 'bg-primary border-primary' : 'border-textMuted'}`}>
-                   {isPaid && <Check size={16} className="text-background" strokeWidth={3} />}
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm font-bold text-textMain">¿Ya fue pagado?</span>
-                  <span className="text-[10px] text-textMuted">Se marcará como completado inmediatamente.</span>
-                </div>
-             </div>
+            <div
+              className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5 cursor-pointer hover:bg-white/10 transition-colors"
+              onClick={() => setIsPaid(!isPaid)}
+            >
+              <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${isPaid ? 'bg-primary border-primary' : 'border-textMuted'}`}>
+                {isPaid && <Check size={16} className="text-background" strokeWidth={3} />}
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-textMain">¿Ya fue pagado?</span>
+                <span className="text-[10px] text-textMuted">Se marcará como completado inmediatamente.</span>
+              </div>
+            </div>
           )}
 
           <button

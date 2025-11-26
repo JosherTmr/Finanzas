@@ -1,26 +1,64 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useFinance } from '../context/FinanceContext';
 import { X, Save, Briefcase, Clock, DollarSign } from 'lucide-react';
+import { calculateHourlyRate, getHourlyRateMessage } from '../utils/workTimeCalculator';
 
 interface Props {
   onClose: () => void;
 }
 
 const SettingsModal: React.FC<Props> = ({ onClose }) => {
-  const { userConfig, updateUserConfig } = useFinance();
-  
+  const { userConfig, updateUserConfig, getMonthlyIncomeTransaction, updateMonthlyIncome } = useFinance();
+
+  // Get the actual monthly income from transactions
+  const incomeTransaction = getMonthlyIncomeTransaction();
+  const currentIncome = incomeTransaction?.amount || 0;
+
   const [days, setDays] = useState(userConfig.workDaysPerWeek.toString());
   const [hours, setHours] = useState(userConfig.workHoursPerDay.toString());
-  const [income, setIncome] = useState(userConfig.monthlyIncome.toString());
+  const [income, setIncome] = useState(currentIncome.toString());
+
+  // Sync state with context when data changes (fixes stale data on re-open)
+  React.useEffect(() => {
+    setIncome(currentIncome.toString());
+    setDays(userConfig.workDaysPerWeek.toString());
+    setHours(userConfig.workHoursPerDay.toString());
+  }, [currentIncome, userConfig]);
+
+  // Calculate hourly rate in real-time
+  const hourlyRate = useMemo(() => {
+    const incomeNum = parseFloat(income) || 0;
+    const daysNum = parseFloat(days) || 5;
+    const hoursNum = parseFloat(hours) || 8;
+    return calculateHourlyRate(incomeNum, daysNum, hoursNum);
+  }, [income, days, hours]);
+
+  const hourlyRateMessage = useMemo(() => {
+    return getHourlyRateMessage(hourlyRate);
+  }, [hourlyRate]);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    updateUserConfig({
-      monthlyIncome: parseFloat(income) || 0,
-      workDaysPerWeek: parseFloat(days) || 5,
-      workHoursPerDay: parseFloat(hours) || 8
-    });
-    onClose();
+
+    try {
+      // Update monthly income using the new method (preserves history)
+      const newIncome = parseFloat(income) || 0;
+      if (newIncome !== currentIncome) {
+        updateMonthlyIncome(newIncome);
+      }
+
+      // Update work configuration
+      updateUserConfig({
+        ...userConfig,
+        workDaysPerWeek: parseFloat(days) || 5,
+        workHoursPerDay: parseFloat(hours) || 8
+      });
+    } catch (error: any) {
+      console.error("Error saving settings:", error);
+      alert(`Hubo un error al guardar: ${error.message || 'Error desconocido'}`);
+    } finally {
+      onClose();
+    }
   };
 
   return (
@@ -37,7 +75,7 @@ const SettingsModal: React.FC<Props> = ({ onClose }) => {
           {/* Income (Reference) */}
           <div>
             <label className="flex items-center gap-2 text-xs font-bold text-textMuted uppercase tracking-wider mb-2">
-              <DollarSign size={14} /> Salario Base (Referencia)
+              <DollarSign size={14} /> Sueldo Mensual
             </label>
             <input
               type="number"
@@ -46,45 +84,57 @@ const SettingsModal: React.FC<Props> = ({ onClose }) => {
               className="w-full bg-background border border-white/10 rounded-xl py-3 px-4 text-textMain focus:outline-none focus:border-primary text-lg"
               placeholder="0"
             />
-            <p className="text-[10px] text-textMuted mt-1">Este valor es referencial, los cálculos usan tus ingresos reales del mes.</p>
+            <p className="text-[10px] text-textMuted mt-1">Los cambios se aplicarán desde el mes actual en adelante, preservando el historial.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-             {/* Days per week */}
-             <div>
-                <label className="flex items-center gap-2 text-xs font-bold text-textMuted uppercase tracking-wider mb-2">
-                  <Briefcase size={14} /> Días / Semana
-                </label>
-                <input
-                  type="number"
-                  max="7"
-                  min="1"
-                  value={days}
-                  onChange={(e) => setDays(e.target.value)}
-                  className="w-full bg-background border border-white/10 rounded-xl py-3 px-4 text-textMain focus:outline-none focus:border-primary text-lg"
-                />
-             </div>
+            {/* Days per week */}
+            <div>
+              <label className="flex items-center gap-2 text-xs font-bold text-textMuted uppercase tracking-wider mb-2">
+                <Briefcase size={14} /> Días / Semana
+              </label>
+              <input
+                type="number"
+                max="7"
+                min="1"
+                value={days}
+                onChange={(e) => setDays(e.target.value)}
+                className="w-full bg-background border border-white/10 rounded-xl py-3 px-4 text-textMain focus:outline-none focus:border-primary text-lg"
+              />
+            </div>
 
-             {/* Hours per day */}
-             <div>
-                <label className="flex items-center gap-2 text-xs font-bold text-textMuted uppercase tracking-wider mb-2">
-                  <Clock size={14} /> Horas / Día
-                </label>
-                <input
-                  type="number"
-                  max="24"
-                  min="1"
-                  value={hours}
-                  onChange={(e) => setHours(e.target.value)}
-                  className="w-full bg-background border border-white/10 rounded-xl py-3 px-4 text-textMain focus:outline-none focus:border-primary text-lg"
-                />
-             </div>
+            {/* Hours per day */}
+            <div>
+              <label className="flex items-center gap-2 text-xs font-bold text-textMuted uppercase tracking-wider mb-2">
+                <Clock size={14} /> Horas / Día
+              </label>
+              <input
+                type="number"
+                max="24"
+                min="1"
+                value={hours}
+                onChange={(e) => setHours(e.target.value)}
+                className="w-full bg-background border border-white/10 rounded-xl py-3 px-4 text-textMain focus:outline-none focus:border-primary text-lg"
+              />
+            </div>
           </div>
 
-          <div className="bg-primary/5 p-4 rounded-xl border border-primary/10">
-             <p className="text-xs text-primary/80 leading-relaxed text-center">
-               Estos datos se usarán para calcular cuántas <strong>horas de vida</strong> te cuestan tus gastos reales cada mes.
-             </p>
+          <div className="space-y-3">
+            {/* Hourly rate preview */}
+            {hourlyRate > 0 && (
+              <div className="bg-secondary/10 p-4 rounded-xl border border-secondary/20">
+                <p className="text-xs text-secondary/80 leading-relaxed text-center">
+                  💰 {hourlyRateMessage}
+                </p>
+              </div>
+            )}
+
+            {/* Motivational message */}
+            <div className="bg-primary/5 p-4 rounded-xl border border-primary/10">
+              <p className="text-xs text-primary/80 leading-relaxed text-center">
+                Estos datos se usarán para mostrarte cuántas <strong>horas de vida</strong> te cuestan tus gastos reales cada mes. ¡Toma decisiones más conscientes! 💪
+              </p>
+            </div>
           </div>
 
           <button

@@ -15,12 +15,12 @@ const MONTH_NAMES = [
 ];
 
 const MonthDetail: React.FC<Props> = ({ onBack }) => {
-  const { 
-    transactions, 
-    selectedMonth, 
-    selectedYear, 
-    getStatus, 
-    toggleStatus, 
+  const {
+    transactions,
+    selectedMonth,
+    selectedYear,
+    getStatus,
+    toggleStatus,
     deleteTransaction,
     addTransaction,
     updateTransaction,
@@ -35,7 +35,7 @@ const MonthDetail: React.FC<Props> = ({ onBack }) => {
 
   // Calculate total monthly work hours based on config
   const totalMonthlyWorkHours = useMemo(() => {
-     return userConfig.workDaysPerWeek * userConfig.workHoursPerDay * 4;
+    return userConfig.workDaysPerWeek * userConfig.workHoursPerDay * 4;
   }, [userConfig]);
 
   // Filter and Sort Transactions
@@ -76,14 +76,14 @@ const MonthDetail: React.FC<Props> = ({ onBack }) => {
 
     currentMonthTransactions.forEach(t => {
       const isPaid = getStatus(t.id, monthKey);
-      
+
       if (t.type === 'income') {
         income += t.amount;
       } else {
         if (t.type === 'expense') expenses += t.amount;
         if (t.type === 'debt') debt += t.amount;
         if (t.type === 'savings') savings += t.amount;
-        
+
         if (isPaid) paidTotal += t.amount;
         else pendingTotal += t.amount;
       }
@@ -101,11 +101,11 @@ const MonthDetail: React.FC<Props> = ({ onBack }) => {
 
   const getInstallmentInfo = (t: Transaction) => {
     if (t.recurrence !== 'monthly-range' || !t.endDate) return null;
-    
+
     // Parse dates ensuring integer values to avoid timezone shifts
     const [sYear, sMonth] = t.startDate.split('-').map(Number);
     const [eYear, eMonth] = t.endDate.split('-').map(Number);
-    
+
     // Normalize logic (Month is 1-based in split, need 0-based for calculation consistency with selectedMonth)
     const startMIndex = sMonth - 1;
     const endMIndex = eMonth - 1;
@@ -124,137 +124,141 @@ const MonthDetail: React.FC<Props> = ({ onBack }) => {
           <ArrowLeft size={24} />
         </button>
         <div>
-           <h1 className="text-lg font-bold text-textMain">{MONTH_NAMES[selectedMonth]} {selectedYear}</h1>
+          <h1 className="text-lg font-bold text-textMain">{MONTH_NAMES[selectedMonth]} {selectedYear}</h1>
         </div>
       </div>
 
       {/* Main Stats Card */}
       <div className="p-4">
         <div className="bg-gradient-to-br from-surface to-card rounded-2xl p-5 shadow-lg border border-white/5">
-            <div className="flex justify-between items-end mb-4">
-                <div>
-                    <span className="text-textMuted text-xs uppercase tracking-wider font-semibold">Disponible</span>
-                    <div className={`text-4xl font-bold mt-1 ${summary.balance >= 0 ? 'text-income' : 'text-expense'}`}>
-                        {formatCurrency(summary.balance)}
-                    </div>
-                </div>
+          <div className="flex justify-between items-end mb-4">
+            <div>
+              <span className="text-textMuted text-xs uppercase tracking-wider font-semibold">Disponible</span>
+              <div className={`text-4xl font-bold mt-1 ${summary.balance >= 0 ? 'text-income' : 'text-expense'}`}>
+                {formatCurrency(summary.balance)}
+              </div>
             </div>
+          </div>
 
-            <div className="grid grid-cols-3 gap-2 mt-4 text-center">
-                <div className="bg-black/20 p-2 rounded-lg">
-                   <span className="text-[10px] text-textMuted uppercase block">Ingresos</span>
-                   <span className="text-income font-semibold text-sm">{formatCurrency(summary.income)}</span>
-                </div>
-                <div className="bg-black/20 p-2 rounded-lg">
-                   <span className="text-[10px] text-textMuted uppercase block">Planificado</span>
-                   <span className="text-expense font-semibold text-sm">{formatCurrency(summary.totalOut)}</span>
-                </div>
-                <div className="bg-black/20 p-2 rounded-lg">
-                   <span className="text-[10px] text-textMuted uppercase block">Pendiente</span>
-                   <span className="text-textMain font-semibold text-sm">{formatCurrency(summary.pendingTotal)}</span>
-                </div>
+          <div className="grid grid-cols-3 gap-2 mt-4 text-center">
+            <div className="bg-black/20 p-2 rounded-lg">
+              <span className="text-[10px] text-textMuted uppercase block">Ingresos</span>
+              <span className="text-income font-semibold text-sm">{formatCurrency(summary.income)}</span>
             </div>
+            <div className="bg-black/20 p-2 rounded-lg">
+              <span className="text-[10px] text-textMuted uppercase block">Planificado</span>
+              <span className="text-expense font-semibold text-sm">{formatCurrency(summary.totalOut)}</span>
+            </div>
+            <div className="bg-black/20 p-2 rounded-lg">
+              <span className="text-[10px] text-textMuted uppercase block">Pendiente</span>
+              <span className="text-textMain font-semibold text-sm">{formatCurrency(summary.pendingTotal)}</span>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Checklist Section */}
       <div className="px-4">
         <h3 className="text-textMuted text-sm font-medium mb-3 ml-1 uppercase tracking-wider">Movimientos</h3>
-        
+
         <div className="space-y-3">
           {currentMonthTransactions.length === 0 ? (
             <div className="text-center py-12 opacity-50">
-               <p>No hay registros este mes.</p>
-               <button onClick={() => setIsFormOpen(true)} className="mt-4 text-primary font-bold">Agregar Gasto</button>
+              <p>No hay registros este mes.</p>
+              <button onClick={() => setIsFormOpen(true)} className="mt-4 text-primary font-bold">Agregar Gasto</button>
             </div>
           ) : (
             currentMonthTransactions.map(t => {
-               const isCompleted = getStatus(t.id, monthKey);
-               const isIncome = t.type === 'income';
-               // Use calculated work hours from config
-               const workHours = !isIncome ? calculateWorkHours(t.amount, summary.income, totalMonthlyWorkHours) : null;
-               const installment = getInstallmentInfo(t);
+              const isCompleted = getStatus(t.id, monthKey);
+              const isIncome = t.type === 'income';
+              // Use calculated work hours from config
+              const workHours = !isIncome ? calculateWorkHours(t.amount, summary.income, totalMonthlyWorkHours) : null;
+              const installment = getInstallmentInfo(t);
 
-               return (
-                 <div 
-                   key={t.id}
-                   className={`
+              return (
+                <div
+                  key={t.id}
+                  className={`
                      group relative flex items-center p-4 rounded-xl border transition-all duration-300
-                     ${isCompleted 
-                        ? 'bg-black/20 border-transparent opacity-50' 
-                        : 'bg-card border-white/5 shadow-md hover:translate-x-1'
-                     }
+                     ${isCompleted
+                      ? 'bg-black/20 border-transparent opacity-50'
+                      : 'bg-card border-white/5 shadow-md hover:translate-x-1'
+                    }
                    `}
-                 >
-                    {/* Checkbox Logic */}
+                >
+                  {/* Checkbox Logic - Only show for non-income transactions */}
+                  {!isIncome && (
                     <button
                       onClick={() => toggleStatus(t.id, monthKey)}
                       className={`
                         w-6 h-6 rounded-md border-2 mr-4 flex items-center justify-center transition-colors
-                        ${isCompleted 
-                           ? 'bg-primary border-primary text-background' 
-                           : 'bg-transparent border-textMuted group-hover:border-primary'
+                        ${isCompleted
+                          ? 'bg-primary border-primary text-background'
+                          : 'bg-transparent border-textMuted group-hover:border-primary'
                         }
                       `}
                     >
                       {isCompleted && <Check size={16} strokeWidth={3} />}
                     </button>
+                  )}
+                  {/* Spacer for income items to maintain alignment */}
+                  {isIncome && <div className="w-6 mr-4" />}
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0" onClick={() => { setEditingItem(t); setIsFormOpen(true); }}>
-                       <div className="flex justify-between items-start">
-                          <span className={`font-medium text-base truncate mt-0.5 ${isCompleted ? 'line-through text-textMuted' : 'text-textMain'}`}>
-                            {t.title}
-                          </span>
-                          
-                          <div className="text-right ml-2">
-                            <span className={`font-bold whitespace-nowrap block ${isIncome ? 'text-income' : 'text-textMain'}`}>
-                                {isIncome ? '+' : '-'}{formatCurrency(t.amount)}
-                            </span>
-                            {/* Feature A: Life Cost Indicator (ALWAYS SHOWING) */}
-                            {workHours && (
-                                <span className="text-[10px] text-primary/70 font-medium flex items-center justify-end gap-1 mt-0.5">
-                                    <Timer size={10} />
-                                    {workHours} vida
-                                </span>
-                            )}
-                          </div>
-                       </div>
-                       
-                       <div className="flex items-center flex-wrap gap-2 mt-1">
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full bg-black/30 text-textMuted uppercase tracking-wide border border-white/5`}>
-                            {CATEGORY_LABELS[t.category]}
-                          </span>
-                          
-                          {/* Feature B: Installment Badge */}
-                          {installment && (
-                              <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-expense/30 text-expense bg-expense/5 font-medium">
-                                  Cuota {installment.current}/{installment.total}
-                              </span>
-                          )}
+                  {/* Content */}
+                  <div className="flex-1 min-w-0" onClick={() => { setEditingItem(t); setIsFormOpen(true); }}>
+                    <div className="flex justify-between items-start">
+                      <span className={`font-medium text-base truncate mt-0.5 ${isCompleted ? 'line-through text-textMuted' : 'text-textMain'}`}>
+                        {t.title}
+                      </span>
 
-                          {t.recurrence === 'permanent' && (
-                             <span className="flex items-center gap-1 text-[10px] text-primary">
-                                <Bookmark size={10} /> Fijo
-                             </span>
-                          )}
-                          
-                          {t.recurrence === 'monthly-range' && !installment && (
-                             <span className="flex items-center gap-1 text-[10px] text-secondary">
-                                <CalendarClock size={10} /> Recurrente
-                             </span>
-                          )}
-                       </div>
+                      <div className="text-right ml-2">
+                        <span className={`font-bold whitespace-nowrap block ${isIncome ? 'text-income' : 'text-textMain'}`}>
+                          {isIncome ? '+' : '-'}{formatCurrency(t.amount)}
+                        </span>
+                        {/* Feature A: Time Coins Indicator */}
+                        {workHours && (
+                          <span className="text-[10px] text-primary/70 font-medium flex items-center justify-end gap-1 mt-0.5">
+                            <Timer size={10} />
+                            {workHours} time coins
+                          </span>
+                        )}
+                      </div>
                     </div>
-                 </div>
-               );
+
+                    <div className="flex items-center flex-wrap gap-2 mt-1">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full bg-black/30 text-textMuted uppercase tracking-wide border border-white/5`}>
+                        {CATEGORY_LABELS[t.category]}
+                      </span>
+
+                      {/* Feature B: Installment Badge */}
+                      {installment && !isIncome && (
+                        <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-expense/30 text-expense bg-expense/5 font-medium">
+                          Cuota {installment.current}/{installment.total}
+                        </span>
+                      )}
+
+                      {t.recurrence === 'permanent' && (
+                        <span className="flex items-center gap-1 text-[10px] text-primary">
+                          <Bookmark size={10} /> Fijo
+                        </span>
+                      )}
+
+                      {t.recurrence === 'monthly-range' && !installment && (
+                        <span className="flex items-center gap-1 text-[10px] text-secondary">
+                          <CalendarClock size={10} /> Recurrente
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
             })
           )}
         </div>
       </div>
 
       {/* FAB */}
-      <button 
+      <button
         onClick={() => { setEditingItem(null); setIsFormOpen(true); }}
         className="fixed bottom-6 right-6 w-14 h-14 bg-primary text-white rounded-2xl shadow-xl shadow-primary/30 flex items-center justify-center hover:scale-105 transition-transform z-40 active:scale-95"
       >
@@ -263,7 +267,7 @@ const MonthDetail: React.FC<Props> = ({ onBack }) => {
 
       {/* Modal */}
       {isFormOpen && (
-        <TransactionForm 
+        <TransactionForm
           initialData={editingItem || undefined}
           onClose={() => setIsFormOpen(false)}
           onSave={(t, isPaidImmediate) => {

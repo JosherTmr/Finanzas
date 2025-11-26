@@ -12,6 +12,8 @@ interface FinanceContextType {
   toggleStatus: (transactionId: string, monthKey: string) => void;
   getStatus: (transactionId: string, monthKey: string) => boolean;
   updateUserConfig: (config: UserConfig) => void;
+  getMonthlyIncomeTransaction: () => Transaction | undefined;
+  updateMonthlyIncome: (newAmount: number) => void;
   selectedYear: number;
   setSelectedYear: (year: number) => void;
   selectedMonth: number; // 0-11
@@ -97,7 +99,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       // 1. Cap the old transaction
       const prevDate = new Date(split);
       prevDate.setDate(prevDate.getDate() - 1);
-      
+
       // Handle timezone offset for YYYY-MM-DD string
       const offset = prevDate.getTimezoneOffset();
       const localPrevDate = new Date(prevDate.getTime() - (offset * 60 * 1000));
@@ -117,7 +119,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
       const newVersion: Transaction = {
         ...updated,
-        id: crypto.randomUUID(), // New ID implies fresh start for stats tracking
+        id: generateUUID(), // New ID implies fresh start for stats tracking
         startDate: startDateStr,
         createdAt: Date.now()
       };
@@ -145,6 +147,66 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     return !!statusMap[`${transactionId}_${monthKey}`];
   };
 
+  // Get the primary monthly income transaction (Sueldo Mensual)
+  const getMonthlyIncomeTransaction = useCallback((): Transaction | undefined => {
+    // Prioritize permanent income transaction (current salary)
+    const permanent = transactions.find(t =>
+      t.type === 'income' && t.recurrence === 'permanent'
+    );
+    if (permanent) return permanent;
+
+    // Fallback to any monthly-range if no permanent exists
+    return transactions.find(t =>
+      t.type === 'income' && t.recurrence === 'monthly-range'
+    );
+  }, [transactions]);
+
+  // Helper for safe UUID generation
+  const generateUUID = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  };
+
+  // Update monthly income with historical preservation
+  const updateMonthlyIncome = (newAmount: number) => {
+    const incomeTransaction = getMonthlyIncomeTransaction();
+    if (!incomeTransaction) {
+      // If no income transaction exists, create a new one
+      const newIncome: Transaction = {
+        id: generateUUID(),
+        title: 'Sueldo Mensual',
+        amount: newAmount,
+        type: 'income',
+        category: 'income',
+        recurrence: 'permanent',
+        startDate: new Date().toISOString().split('T')[0],
+        createdAt: Date.now()
+      };
+      addTransaction(newIncome);
+      return;
+    }
+
+    // If amount hasn't changed, do nothing
+    if (incomeTransaction.amount === newAmount) {
+      return;
+    }
+
+    // Create updated transaction with new amount
+    const updatedTransaction: Transaction = {
+      ...incomeTransaction,
+      amount: newAmount
+    };
+
+    // Use splitTransaction to preserve history
+    // Split at the first day of current month
+    const now = new Date();
+    const splitDate = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    splitTransaction(incomeTransaction, updatedTransaction, splitDate);
+  };
+
   const getMonthlySummary = useCallback((year: number, month: number): MonthlySummary => {
     const monthStart = new Date(year, month, 1);
     const monthEnd = new Date(year, month + 1, 0);
@@ -161,7 +223,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       const tDate = new Date(t.startDate);
       // Logic to check if transaction is active in this month
       let isActive = false;
-      
+
       if (t.recurrence === 'one-time') {
         isActive = tDate.getMonth() === month && tDate.getFullYear() === year;
       } else if (t.recurrence === 'permanent') {
@@ -211,6 +273,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       toggleStatus,
       getStatus,
       updateUserConfig,
+      getMonthlyIncomeTransaction,
+      updateMonthlyIncome,
       selectedYear,
       setSelectedYear,
       selectedMonth,
