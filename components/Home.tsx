@@ -1,19 +1,18 @@
 import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useFinance } from '../context/FinanceContext';
 import { formatCurrency } from '../utils';
 import { ChevronDown, Lock, Settings } from 'lucide-react';
 import SettingsModal from './SettingsModal';
 
-interface Props {
-  onSelectMonth: (monthIndex: number) => void;
-}
+interface Props { }
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
-const Home: React.FC<Props> = ({ onSelectMonth }) => {
+const Home: React.FC<Props> = () => {
   const { selectedYear, setSelectedYear, getMonthlySummary } = useFinance();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -28,7 +27,7 @@ const Home: React.FC<Props> = ({ onSelectMonth }) => {
       {/* Header / Year Selector */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-textMain tracking-tight">Mis Finanzas</h1>
-        
+
         <div className="flex items-center gap-3">
           <div className="relative">
             <select
@@ -43,7 +42,7 @@ const Home: React.FC<Props> = ({ onSelectMonth }) => {
             <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-primary pointer-events-none" />
           </div>
 
-          <button 
+          <button
             onClick={() => setIsSettingsOpen(true)}
             className="p-2.5 bg-surface text-textMuted rounded-xl border border-white/5 hover:text-primary hover:bg-white/5 transition-colors"
           >
@@ -63,13 +62,13 @@ const Home: React.FC<Props> = ({ onSelectMonth }) => {
           const pendingAmount = totalOut * (1 - (summary.executionRate / 100));
 
           return (
-            <div
+            <Link
               key={monthIndex}
-              onClick={() => !isFuture && onSelectMonth(monthIndex)}
+              to={!isFuture ? `/mes/${selectedYear}/${monthIndex}` : '#'}
               className={`
-                relative overflow-hidden rounded-2xl transition-all duration-300 border
-                ${isFuture 
-                  ? 'bg-surface/30 border-white/5 opacity-50 cursor-not-allowed grayscale' 
+                block relative overflow-hidden rounded-2xl transition-all duration-300 border
+                ${isFuture
+                  ? 'bg-surface/30 border-white/5 opacity-50 cursor-not-allowed grayscale pointer-events-none'
                   : 'bg-surface border-white/5 shadow-lg hover:scale-[1.02] cursor-pointer'
                 }
                 ${isCurrent ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}
@@ -103,23 +102,23 @@ const Home: React.FC<Props> = ({ onSelectMonth }) => {
                     </div>
                   </div>
                 )}
-                
+
                 {/* Visual Progress Line for current/past */}
                 {!isFuture && (
-                    <div className="mt-4 h-1.5 w-full bg-black/20 rounded-full overflow-hidden">
-                        <div 
-                            className="h-full bg-gradient-to-r from-primary to-secondary" 
-                            style={{ width: `${summary.executionRate}%` }}
-                        />
-                    </div>
+                  <div className="mt-4 h-1.5 w-full bg-black/20 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-primary to-secondary"
+                      style={{ width: `${summary.executionRate}%` }}
+                    />
+                  </div>
                 )}
               </div>
-              
+
               {/* Decorative bottom gradient */}
               {!isFuture && (
-                 <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-secondary to-surface opacity-50"></div>
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-secondary to-surface opacity-50"></div>
               )}
-            </div>
+            </Link>
           );
         })}
       </div>

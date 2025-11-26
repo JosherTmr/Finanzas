@@ -20,6 +20,7 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
   const [recurrence, setRecurrence] = useState<RecurrenceType>(initialData?.recurrence || 'one-time');
   const [startDate, setStartDate] = useState(initialData?.startDate || new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(initialData?.endDate || '');
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   // New state for immediate payment (only for new entries)
   const [isPaid, setIsPaid] = useState(false);
@@ -48,7 +49,28 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !amount) return;
+    const newErrors: { [key: string]: string } = {};
+
+    // Validate Amount
+    if (!amount || parseFloat(amount) <= 0) {
+      newErrors.amount = 'El monto debe ser mayor a 0';
+    }
+
+    // Validate Dates
+    if (recurrence === 'monthly-range') {
+      if (!startDate) newErrors.startDate = 'Requerido';
+      if (!endDate) newErrors.endDate = 'Requerido';
+      if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
+        newErrors.dateRange = 'La fecha final no puede ser anterior a la inicial';
+      }
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    if (!title) return;
 
     const newTransaction: Transaction = {
       id: initialData?.id || crypto.randomUUID(),
@@ -85,12 +107,16 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
               <input
                 type="number"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full bg-background border border-white/10 rounded-2xl py-4 pl-10 pr-4 text-textMain focus:outline-none focus:border-primary text-3xl font-bold placeholder-white/20"
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  if (errors.amount) setErrors({ ...errors, amount: '' });
+                }}
+                className={`w-full bg-background border rounded-2xl py-4 pl-10 pr-4 text-textMain focus:outline-none focus:border-primary text-3xl font-bold placeholder-white/20 ${errors.amount ? 'border-expense' : 'border-white/10'}`}
                 placeholder="0"
                 autoFocus
               />
             </div>
+            {errors.amount && <p className="text-expense text-xs mt-1 font-medium">{errors.amount}</p>}
             {workTimeMessage && (
               <div className="mt-3 bg-primary/10 border border-primary/20 rounded-xl p-3 animate-fade-in">
                 <p className="text-sm text-primary font-medium text-center">
@@ -174,8 +200,11 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
               <input
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full bg-background border border-white/10 rounded-xl py-3 px-4 text-textMain text-sm scheme-dark"
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  if (errors.dateRange) setErrors({ ...errors, dateRange: '' });
+                }}
+                className={`w-full bg-background border rounded-xl py-3 px-4 text-textMain text-sm scheme-dark ${errors.dateRange || errors.startDate ? 'border-expense' : 'border-white/10'}`}
               />
             </div>
             {recurrence === 'monthly-range' && (
@@ -184,12 +213,16 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
                 <input
                   type="date"
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full bg-background border border-white/10 rounded-xl py-3 px-4 text-textMain text-sm scheme-dark"
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    if (errors.dateRange) setErrors({ ...errors, dateRange: '' });
+                  }}
+                  className={`w-full bg-background border rounded-xl py-3 px-4 text-textMain text-sm scheme-dark ${errors.dateRange || errors.endDate ? 'border-expense' : 'border-white/10'}`}
                 />
               </div>
             )}
           </div>
+          {errors.dateRange && <p className="text-expense text-xs mt-1 font-medium text-center">{errors.dateRange}</p>}
 
           {/* Category */}
           <div>

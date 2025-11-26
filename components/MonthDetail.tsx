@@ -5,20 +5,25 @@ import { formatCurrency, calculateWorkHours } from '../utils';
 import { Check, Edit2, Trash2, Plus, ArrowLeft, RefreshCw, Bookmark, CalendarClock, Timer } from 'lucide-react';
 import TransactionForm from './TransactionForm';
 
-interface Props {
-  onBack: () => void;
-}
+import { useParams, useNavigate } from 'react-router-dom';
+
+interface Props { }
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
-const MonthDetail: React.FC<Props> = ({ onBack }) => {
+const MonthDetail: React.FC<Props> = () => {
+  const navigate = useNavigate();
+  const { year, month } = useParams<{ year: string; month: string }>();
+  const selectedYear = Number(year);
+  const selectedMonth = Number(month);
+
   const {
     transactions,
-    selectedMonth,
-    selectedYear,
+    // selectedMonth, // Removed from context
+    // selectedYear,  // Removed from context
     getStatus,
     toggleStatus,
     deleteTransaction,
@@ -120,7 +125,7 @@ const MonthDetail: React.FC<Props> = ({ onBack }) => {
     <div className="min-h-screen bg-background relative pb-24">
       {/* Navbar */}
       <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-md border-b border-white/5 px-4 h-16 flex items-center gap-4">
-        <button onClick={onBack} className="p-2 rounded-full hover:bg-white/10 text-textMuted">
+        <button onClick={() => navigate('/')} className="p-2 rounded-full hover:bg-white/10 text-textMuted">
           <ArrowLeft size={24} />
         </button>
         <div>
