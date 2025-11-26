@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { useFinance } from '../context/FinanceContext';
 import { CATEGORY_COLORS, CATEGORY_LABELS, Transaction } from '../types';
-import { formatCurrency } from '../utils';
-import { Check, Edit2, Trash2, Plus, ArrowLeft, RefreshCw, Bookmark, CalendarClock } from 'lucide-react';
+import { formatCurrency, calculateWorkHours } from '../utils';
+import { Check, Edit2, Trash2, Plus, ArrowLeft, RefreshCw, Bookmark, CalendarClock, Timer } from 'lucide-react';
 import TransactionForm from './TransactionForm';
 
 interface Props {
@@ -92,6 +92,23 @@ const MonthDetail: React.FC<Props> = ({ onBack }) => {
     }
   };
 
+  const getInstallmentInfo = (t: Transaction) => {
+    if (t.recurrence !== 'monthly-range' || !t.endDate) return null;
+    
+    // Parse dates ensuring integer values to avoid timezone shifts
+    const [sYear, sMonth] = t.startDate.split('-').map(Number);
+    const [eYear, eMonth] = t.endDate.split('-').map(Number);
+    
+    // Normalize logic (Month is 1-based in split, need 0-based for calculation consistency with selectedMonth)
+    const startMIndex = sMonth - 1;
+    const endMIndex = eMonth - 1;
+
+    const totalMonths = (eYear - sYear) * 12 + (endMIndex - startMIndex) + 1;
+    const currentInstallment = (selectedYear - sYear) * 12 + (selectedMonth - startMIndex) + 1;
+
+    return { current: currentInstallment, total: totalMonths };
+  };
+
   return (
     <div className="min-h-screen bg-background relative pb-24">
       {/* Navbar */}
@@ -147,6 +164,8 @@ const MonthDetail: React.FC<Props> = ({ onBack }) => {
             currentMonthTransactions.map(t => {
                const isCompleted = getStatus(t.id, monthKey);
                const isIncome = t.type === 'income';
+               const workHours = !isIncome ? calculateWorkHours(t.amount, summary.income) : null;
+               const installment = getInstallmentInfo(t);
 
                return (
                  <div 
@@ -175,26 +194,44 @@ const MonthDetail: React.FC<Props> = ({ onBack }) => {
 
                     {/* Content */}
                     <div className="flex-1 min-w-0" onClick={() => { setEditingItem(t); setIsFormOpen(true); }}>
-                       <div className="flex justify-between items-baseline">
-                          <span className={`font-medium text-base truncate ${isCompleted ? 'line-through text-textMuted' : 'text-textMain'}`}>
+                       <div className="flex justify-between items-start">
+                          <span className={`font-medium text-base truncate mt-0.5 ${isCompleted ? 'line-through text-textMuted' : 'text-textMain'}`}>
                             {t.title}
                           </span>
-                          <span className={`font-bold ml-2 whitespace-nowrap ${isIncome ? 'text-income' : 'text-textMain'}`}>
-                            {isIncome ? '+' : '-'}{formatCurrency(t.amount)}
-                          </span>
+                          
+                          <div className="text-right ml-2">
+                            <span className={`font-bold whitespace-nowrap block ${isIncome ? 'text-income' : 'text-textMain'}`}>
+                                {isIncome ? '+' : '-'}{formatCurrency(t.amount)}
+                            </span>
+                            {/* Feature A: Life Cost Indicator */}
+                            {workHours && !isCompleted && (
+                                <span className="text-[10px] text-primary/70 font-medium flex items-center justify-end gap-1 mt-0.5">
+                                    <Timer size={10} />
+                                    {workHours} de vida
+                                </span>
+                            )}
+                          </div>
                        </div>
                        
-                       <div className="flex items-center gap-2 mt-1">
+                       <div className="flex items-center flex-wrap gap-2 mt-1">
                           <span className={`text-[10px] px-2 py-0.5 rounded-full bg-black/30 text-textMuted uppercase tracking-wide border border-white/5`}>
                             {CATEGORY_LABELS[t.category]}
                           </span>
                           
+                          {/* Feature B: Installment Badge */}
+                          {installment && (
+                              <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-expense/30 text-expense bg-expense/5 font-medium">
+                                  Cuota {installment.current}/{installment.total}
+                              </span>
+                          )}
+
                           {t.recurrence === 'permanent' && (
                              <span className="flex items-center gap-1 text-[10px] text-primary">
                                 <Bookmark size={10} /> Fijo
                              </span>
                           )}
-                          {t.recurrence === 'monthly-range' && (
+                          {/* Replaced generic Monthly Range text with badge above, but keeping icon if needed or removing strictly if redundant. Keeping generic icon for context if not showing specific installment logic (fallback) */}
+                          {t.recurrence === 'monthly-range' && !installment && (
                              <span className="flex items-center gap-1 text-[10px] text-secondary">
                                 <CalendarClock size={10} /> Recurrente
                              </span>
