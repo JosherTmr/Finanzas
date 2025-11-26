@@ -2,15 +2,15 @@ export type TransactionType = 'expense' | 'income' | 'debt' | 'savings';
 
 export type RecurrenceType = 'one-time' | 'monthly-range' | 'permanent';
 
-export type Category = 
-  | 'housing' 
-  | 'food' 
-  | 'transport' 
-  | 'utilities' 
-  | 'debt' 
-  | 'entertainment' 
-  | 'savings' 
-  | 'income' 
+export type Category =
+  | 'housing'
+  | 'food'
+  | 'transport'
+  | 'utilities'
+  | 'debt'
+  | 'entertainment'
+  | 'savings'
+  | 'income'
   | 'other';
 
 export interface Transaction {
@@ -22,6 +22,9 @@ export interface Transaction {
   recurrence: RecurrenceType;
   startDate: string; // ISO Date YYYY-MM-DD
   endDate?: string; // Optional, for monthly-range
+  totalDebtAmount?: number; // Para saber cuánto fue la deuda original
+  installmentsCount?: number; // Número de cuotas
+  paymentDay?: number; // Día del mes ideal para pagar, 1-31
   notes?: string;
   createdAt: number;
 }
@@ -42,6 +45,8 @@ export interface UserConfig {
   monthlyIncome: number; // Salario base referencia (informativo o fallback)
   workDaysPerWeek: number;
   workHoursPerDay: number;
+  currencyCode: string;
+  locale: string;
 }
 
 export const CATEGORY_LABELS: Record<Category, string> = {

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useFinance } from '../context/FinanceContext';
 import { formatCurrency } from '../utils';
-import { ChevronDown, Lock, Settings } from 'lucide-react';
+import { ChevronDown, Lock, Settings, PiggyBank, CreditCard, Wallet } from 'lucide-react';
 import SettingsModal from './SettingsModal';
 
 interface Props { }
@@ -13,14 +13,33 @@ const MONTH_NAMES = [
 ];
 
 const Home: React.FC<Props> = () => {
-  const { selectedYear, setSelectedYear, getMonthlySummary } = useFinance();
+  const { selectedYear, setSelectedYear, getMonthlySummary, userConfig } = useFinance();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const currentMonthIndex = new Date().getMonth();
   const currentYear = new Date().getFullYear();
 
-  // Create array of months 11 down to 0
   const months = useMemo(() => Array.from({ length: 12 }, (_, i) => 11 - i), []);
+
+  const annualSummary = useMemo(() => {
+    let totalIncome = 0;
+    let totalSavings = 0;
+    let totalExpenses = 0;
+    let totalDebt = 0;
+
+    for (let i = 0; i < 12; i++) {
+      const summary = getMonthlySummary(selectedYear, i);
+      totalIncome += summary.income;
+      totalSavings += summary.savings;
+      totalExpenses += summary.expenses;
+      totalDebt += summary.debt;
+    }
+
+    const totalSpent = totalExpenses + totalDebt;
+    const cashflow = totalIncome - totalSpent;
+
+    return { totalSavings, totalSpent, cashflow };
+  }, [selectedYear, getMonthlySummary]);
 
   return (
     <div className="pb-8 px-4 pt-4 relative">
@@ -48,6 +67,42 @@ const Home: React.FC<Props> = () => {
           >
             <Settings size={20} />
           </button>
+        </div>
+      </div>
+
+      {/* Mini Annual Dashboard */}
+      <div className="grid grid-cols-3 gap-2 mb-8 animate-fade-in">
+        {/* Savings Card */}
+        <div className="bg-surface p-2 md:p-3 rounded-2xl border border-white/5 flex flex-col items-center justify-center text-center">
+          <div className="flex items-center gap-1.5">
+            <PiggyBank className="text-savings flex-shrink-0" size={16} />
+            <span className="text-[9px] md:text-[10px] font-bold text-textMuted uppercase tracking-wider">Ahorro Anual</span>
+          </div>
+          <span className="text-base md:text-lg lg:text-xl font-bold text-white mt-2 break-words">
+            {formatCurrency(annualSummary.totalSavings, userConfig.currencyCode, userConfig.locale)}
+          </span>
+        </div>
+
+        {/* Spent Card */}
+        <div className="bg-surface p-2 md:p-3 rounded-2xl border border-white/5 flex flex-col items-center justify-center text-center">
+          <div className="flex items-center gap-1.5">
+            <CreditCard className="text-expense flex-shrink-0" size={16} />
+            <span className="text-[9px] md:text-[10px] font-bold text-textMuted uppercase tracking-wider">Gastos + Deudas</span>
+          </div>
+          <span className="text-base md:text-lg lg:text-xl font-bold text-white mt-2 break-words">
+            {formatCurrency(annualSummary.totalSpent, userConfig.currencyCode, userConfig.locale)}
+          </span>
+        </div>
+
+        {/* Cashflow Card */}
+        <div className="bg-surface p-2 md:p-3 rounded-2xl border border-white/5 flex flex-col items-center justify-center text-center">
+          <div className="flex items-center gap-1.5">
+            <Wallet className="text-primary flex-shrink-0" size={16} />
+            <span className="text-[9px] md:text-[10px] font-bold text-textMuted uppercase tracking-wider">Flujo de Caja</span>
+          </div>
+          <span className={`text-base md:text-lg lg:text-xl font-bold mt-2 break-words ${annualSummary.cashflow >= 0 ? 'text-white' : 'text-expense'}`}>
+            {formatCurrency(annualSummary.cashflow, userConfig.currencyCode, userConfig.locale)}
+          </span>
         </div>
       </div>
 
@@ -91,13 +146,13 @@ const Home: React.FC<Props> = () => {
                     <div>
                       <span className="text-xs text-textMuted block mb-1">Balance (Disp.)</span>
                       <span className={`text-lg font-bold ${summary.balance >= 0 ? 'text-white' : 'text-expense'}`}>
-                        {formatCurrency(summary.balance)}
+                        {formatCurrency(summary.balance, userConfig.currencyCode, userConfig.locale)}
                       </span>
                     </div>
                     <div className="text-right">
                       <span className="text-xs text-textMuted block mb-1">Por Pagar</span>
                       <span className="text-lg font-bold text-expense">
-                        {formatCurrency(pendingAmount)}
+                        {formatCurrency(pendingAmount, userConfig.currencyCode, userConfig.locale)}
                       </span>
                     </div>
                   </div>

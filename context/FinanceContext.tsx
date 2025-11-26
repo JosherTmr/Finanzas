@@ -36,7 +36,9 @@ const INITIAL_DATA: Transaction[] = [
 const INITIAL_CONFIG: UserConfig = {
   monthlyIncome: 0,
   workDaysPerWeek: 5,
-  workHoursPerDay: 8
+  workHoursPerDay: 8,
+  currencyCode: 'COP',
+  locale: 'es-CO'
 };
 
 export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {

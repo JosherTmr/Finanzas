@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useFinance } from '../context/FinanceContext';
-import { X, Save, Briefcase, Clock, DollarSign } from 'lucide-react';
+import { X, Save, Briefcase, Clock, DollarSign, Globe } from 'lucide-react';
 import { calculateHourlyRate, getHourlyRateMessage } from '../utils/workTimeCalculator';
 
 interface Props {
@@ -17,12 +17,16 @@ const SettingsModal: React.FC<Props> = ({ onClose }) => {
   const [days, setDays] = useState(userConfig.workDaysPerWeek.toString());
   const [hours, setHours] = useState(userConfig.workHoursPerDay.toString());
   const [income, setIncome] = useState(currentIncome.toString());
+  const [currency, setCurrency] = useState(userConfig.currencyCode || 'COP');
+  const [locale, setLocale] = useState(userConfig.locale || 'es-CO');
 
   // Sync state with context when data changes (fixes stale data on re-open)
   React.useEffect(() => {
     setIncome(currentIncome.toString());
     setDays(userConfig.workDaysPerWeek.toString());
     setHours(userConfig.workHoursPerDay.toString());
+    setCurrency(userConfig.currencyCode || 'COP');
+    setLocale(userConfig.locale || 'es-CO');
   }, [currentIncome, userConfig]);
 
   // Calculate hourly rate in real-time
@@ -51,7 +55,9 @@ const SettingsModal: React.FC<Props> = ({ onClose }) => {
       updateUserConfig({
         ...userConfig,
         workDaysPerWeek: parseFloat(days) || 5,
-        workHoursPerDay: parseFloat(hours) || 8
+        workHoursPerDay: parseFloat(hours) || 8,
+        currencyCode: currency,
+        locale: locale
       });
     } catch (error: any) {
       console.error("Error saving settings:", error);
@@ -116,6 +122,46 @@ const SettingsModal: React.FC<Props> = ({ onClose }) => {
                 onChange={(e) => setHours(e.target.value)}
                 className="w-full bg-background border border-white/10 rounded-xl py-3 px-4 text-textMain focus:outline-none focus:border-primary text-lg"
               />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* Currency */}
+            <div>
+              <label className="flex items-center gap-2 text-xs font-bold text-textMuted uppercase tracking-wider mb-2">
+                <Globe size={14} /> Moneda
+              </label>
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="w-full bg-background border border-white/10 rounded-xl py-3 px-4 text-textMain focus:outline-none focus:border-primary text-lg appearance-none"
+              >
+                <option value="COP">COP ($)</option>
+                <option value="USD">USD ($)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="MXN">MXN ($)</option>
+                <option value="ARS">ARS ($)</option>
+                <option value="CLP">CLP ($)</option>
+              </select>
+            </div>
+
+            {/* Locale */}
+            <div>
+              <label className="flex items-center gap-2 text-xs font-bold text-textMuted uppercase tracking-wider mb-2">
+                <Globe size={14} /> Formato
+              </label>
+              <select
+                value={locale}
+                onChange={(e) => setLocale(e.target.value)}
+                className="w-full bg-background border border-white/10 rounded-xl py-3 px-4 text-textMain focus:outline-none focus:border-primary text-lg appearance-none"
+              >
+                <option value="es-CO">Colombia</option>
+                <option value="en-US">USA</option>
+                <option value="es-ES">España</option>
+                <option value="es-MX">México</option>
+                <option value="es-AR">Argentina</option>
+                <option value="es-CL">Chile</option>
+              </select>
             </div>
           </div>
 

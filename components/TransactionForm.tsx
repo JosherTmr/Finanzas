@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Category, RecurrenceType, Transaction, TransactionType } from '../types';
 import { X, Check } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
@@ -14,50 +14,58 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
   const { userConfig, getMonthlyIncomeTransaction } = useFinance();
 
   const [title, setTitle] = useState(initialData?.title || '');
+  // This 'amount' state will now handle BOTH monthly amount and total debt amount
   const [amount, setAmount] = useState(initialData?.amount?.toString() || '');
   const [type, setType] = useState<TransactionType>(initialData?.type || 'expense');
   const [category, setCategory] = useState<Category>(initialData?.category || 'food');
   const [recurrence, setRecurrence] = useState<RecurrenceType>(initialData?.recurrence || 'one-time');
   const [startDate, setStartDate] = useState(initialData?.startDate || new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(initialData?.endDate || '');
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  
+  // New fields for Smart Debt Mode
+  const [totalDebtAmount, setTotalDebtAmount] = useState(initialData?.totalDebtAmount?.toString() || '');
+  const [installmentsCount, setInstallmentsCount] = useState(initialData?.installmentsCount?.toString() || '');
+  const [paymentDay, setPaymentDay] = useState(initialData?.paymentDay?.toString() || '1');
 
-  // New state for immediate payment (only for new entries)
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isPaid, setIsPaid] = useState(false);
 
-  // Calculate work time message for expenses
+  const isSmartDebtMode = useMemo(() => type === 'debt' && recurrence === 'monthly-range', [type, recurrence]);
+
+  // Effect for one-time expenses
+  useEffect(() => {
+    if (type === 'expense' && recurrence === 'one-time') {
+      setIsPaid(true);
+    } else {
+      setIsPaid(false); // Reset if conditions change
+    }
+  }, [type, recurrence]);
+
   const workTimeMessage = useMemo(() => {
-    if (type !== 'expense' || !amount || parseFloat(amount) <= 0) {
+    const amountToCompare = isSmartDebtMode ? totalDebtAmount : amount;
+    if (type !== 'expense' || !amountToCompare || parseFloat(amountToCompare) <= 0) {
       return '';
     }
-
     const incomeTransaction = getMonthlyIncomeTransaction();
     const monthlyIncome = incomeTransaction?.amount || 0;
-
-    if (monthlyIncome <= 0) {
-      return '';
-    }
-
-    const hourlyRate = calculateHourlyRate(
-      monthlyIncome,
-      userConfig.workDaysPerWeek,
-      userConfig.workHoursPerDay
-    );
-
-    return getWorkTimeMessage(parseFloat(amount), hourlyRate, userConfig.workHoursPerDay);
-  }, [amount, type, userConfig, getMonthlyIncomeTransaction]);
+    if (monthlyIncome <= 0) return '';
+    const hourlyRate = calculateHourlyRate(monthlyIncome, userConfig.workDaysPerWeek, userConfig.workHoursPerDay);
+    return getWorkTimeMessage(parseFloat(amountToCompare), hourlyRate, userConfig.workHoursPerDay);
+  }, [amount, totalDebtAmount, isSmartDebtMode, type, userConfig, getMonthlyIncomeTransaction]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: { [key: string]: string } = {};
 
-    // Validate Amount
-    if (!amount || parseFloat(amount) <= 0) {
-      newErrors.amount = 'El monto debe ser mayor a 0';
+    if (isSmartDebtMode) {
+      if (!totalDebtAmount || parseFloat(totalDebtAmount) <= 0) newErrors.totalDebtAmount = 'El monto debe ser mayor a 0';
+      if (!installmentsCount || parseInt(installmentsCount) <= 0) newErrors.installmentsCount = 'Debe ser al menos 1 cuota';
+      if (!paymentDay || parseInt(paymentDay) < 1 || parseInt(paymentDay) > 31) newErrors.paymentDay = 'Día inválido';
+    } else {
+      if (!amount || parseFloat(amount) <= 0) newErrors.amount = 'El monto debe ser mayor a 0';
     }
 
-    // Validate Dates
-    if (recurrence === 'monthly-range') {
+    if (recurrence === 'monthly-range' && !isSmartDebtMode) {
       if (!startDate) newErrors.startDate = 'Requerido';
       if (!endDate) newErrors.endDate = 'Requerido';
       if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
@@ -72,15 +80,31 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
 
     if (!title) return;
 
+    let finalAmount = parseFloat(amount);
+    let finalEndDate = recurrence === 'monthly-range' ? endDate : undefined;
+
+    if (isSmartDebtMode) {
+      const total = parseFloat(totalDebtAmount);
+      const installments = parseInt(installmentsCount);
+      finalAmount = total / installments;
+
+      const start = new Date(startDate);
+      start.setUTCMonth(start.getUTCMonth() + installments);
+      finalEndDate = start.toISOString().split('T')[0];
+    }
+
     const newTransaction: Transaction = {
       id: initialData?.id || crypto.randomUUID(),
       title,
-      amount: parseFloat(amount),
+      amount: finalAmount,
       type,
       category,
       recurrence,
       startDate,
-      endDate: recurrence === 'monthly-range' ? endDate : undefined,
+      endDate: finalEndDate,
+      totalDebtAmount: isSmartDebtMode ? parseFloat(totalDebtAmount) : undefined,
+      installmentsCount: isSmartDebtMode ? parseInt(installmentsCount) : undefined,
+      paymentDay: isSmartDebtMode ? parseInt(paymentDay) : undefined,
       createdAt: initialData?.createdAt || Date.now(),
     };
 
@@ -101,22 +125,30 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6">
           {/* Amount */}
           <div>
-            <label className="block text-xs font-bold text-textMuted uppercase tracking-wider mb-2">Monto</label>
+            <label className="block text-xs font-bold text-textMuted uppercase tracking-wider mb-2">
+              {isSmartDebtMode ? 'Monto Total de la Deuda' : 'Monto'}
+            </label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-textMuted text-xl">$</span>
               <input
                 type="number"
-                value={amount}
+                value={isSmartDebtMode ? totalDebtAmount : amount}
                 onChange={(e) => {
-                  setAmount(e.target.value);
-                  if (errors.amount) setErrors({ ...errors, amount: '' });
+                  if (isSmartDebtMode) {
+                    setTotalDebtAmount(e.target.value);
+                    if (errors.totalDebtAmount) setErrors({ ...errors, totalDebtAmount: '' });
+                  } else {
+                    setAmount(e.target.value);
+                    if (errors.amount) setErrors({ ...errors, amount: '' });
+                  }
                 }}
-                className={`w-full bg-background border rounded-2xl py-4 pl-10 pr-4 text-textMain focus:outline-none focus:border-primary text-3xl font-bold placeholder-white/20 ${errors.amount ? 'border-expense' : 'border-white/10'}`}
+                className={`w-full bg-background border rounded-2xl py-4 pl-10 pr-4 text-textMain focus:outline-none focus:border-primary text-3xl font-bold placeholder-white/20 ${errors.amount || errors.totalDebtAmount ? 'border-expense' : 'border-white/10'}`}
                 placeholder="0"
                 autoFocus
               />
             </div>
             {errors.amount && <p className="text-expense text-xs mt-1 font-medium">{errors.amount}</p>}
+            {errors.totalDebtAmount && <p className="text-expense text-xs mt-1 font-medium">{errors.totalDebtAmount}</p>}
             {workTimeMessage && (
               <div className="mt-3 bg-primary/10 border border-primary/20 rounded-xl p-3 animate-fade-in">
                 <p className="text-sm text-primary font-medium text-center">
@@ -191,11 +223,47 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
             </p>
           </div>
 
+          {/* Smart Debt Fields */}
+          {isSmartDebtMode && (
+            <div className="grid grid-cols-2 gap-4 animate-fade-in">
+              <div>
+                <label className="block text-xs font-bold text-textMuted uppercase tracking-wider mb-2">Nº Cuotas</label>
+                <input
+                  type="number"
+                  value={installmentsCount}
+                  onChange={(e) => {
+                    setInstallmentsCount(e.target.value);
+                    if (errors.installmentsCount) setErrors({ ...errors, installmentsCount: '' });
+                  }}
+                  className={`w-full bg-background border rounded-xl py-3 px-4 text-textMain text-sm scheme-dark ${errors.installmentsCount ? 'border-expense' : 'border-white/10'}`}
+                  placeholder="Ej: 12"
+                />
+                {errors.installmentsCount && <p className="text-expense text-xs mt-1 font-medium">{errors.installmentsCount}</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-textMuted uppercase tracking-wider mb-2">Día de Pago</label>
+                <input
+                  type="number"
+                  value={paymentDay}
+                  min="1"
+                  max="31"
+                  onChange={(e) => {
+                    setPaymentDay(e.target.value);
+                    if (errors.paymentDay) setErrors({ ...errors, paymentDay: '' });
+                  }}
+                  className={`w-full bg-background border rounded-xl py-3 px-4 text-textMain text-sm scheme-dark ${errors.paymentDay ? 'border-expense' : 'border-white/10'}`}
+                  placeholder="1-31"
+                />
+                {errors.paymentDay && <p className="text-expense text-xs mt-1 font-medium">{errors.paymentDay}</p>}
+              </div>
+            </div>
+          )}
+
           {/* Date Logic */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-textMuted uppercase tracking-wider mb-2">
-                {recurrence === 'permanent' ? 'Desde' : 'Fecha'}
+                {recurrence === 'permanent' ? 'Desde' : 'Fecha Inicio'}
               </label>
               <input
                 type="date"
@@ -207,8 +275,8 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
                 className={`w-full bg-background border rounded-xl py-3 px-4 text-textMain text-sm scheme-dark ${errors.dateRange || errors.startDate ? 'border-expense' : 'border-white/10'}`}
               />
             </div>
-            {recurrence === 'monthly-range' && (
-              <div>
+            {recurrence === 'monthly-range' && !isSmartDebtMode && (
+              <div className="animate-fade-in">
                 <label className="block text-xs font-bold text-textMuted uppercase tracking-wider mb-2">Hasta</label>
                 <input
                   type="date"
@@ -244,8 +312,8 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
             </select>
           </div>
 
-          {/* Paid Checkbox - Only for new one-time transactions */}
-          {!initialData && recurrence === 'one-time' && (
+          {/* Paid Checkbox - Now hidden for one-time expenses, logic is automatic */}
+          {!initialData && recurrence === 'one-time' && type !== 'expense' && (
             <div
               className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5 cursor-pointer hover:bg-white/10 transition-colors"
               onClick={() => setIsPaid(!isPaid)}
