@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useFinance } from '../context/FinanceContext';
 import { formatCurrency } from '../utils';
-import { ChevronDown, Lock, Settings, PiggyBank, CreditCard, Wallet } from 'lucide-react';
+import { ChevronDown, Lock, Settings, PiggyBank, CreditCard, Wallet, Cloud } from 'lucide-react';
 import SettingsModal from './SettingsModal';
 
 interface Props { }
@@ -13,7 +13,7 @@ const MONTH_NAMES = [
 ];
 
 const Home: React.FC<Props> = () => {
-  const { selectedYear, setSelectedYear, getMonthlySummary, userConfig } = useFinance();
+  const { selectedYear, setSelectedYear, getMonthlySummary, userConfig, isGoogleAuth } = useFinance();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const currentMonthIndex = new Date().getMonth();
@@ -60,6 +60,16 @@ const Home: React.FC<Props> = () => {
             </select>
             <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-primary pointer-events-none" />
           </div>
+
+          <Link
+            to="/login"
+            className={`p-2.5 rounded-xl border transition-colors ${isGoogleAuth
+              ? 'bg-green-500/10 text-green-500 border-green-500/20'
+              : 'bg-surface text-textMuted border-white/5 hover:text-primary hover:bg-white/5'
+              }`}
+          >
+            <Cloud size={20} />
+          </Link>
 
           <button
             onClick={() => setIsSettingsOpen(true)}

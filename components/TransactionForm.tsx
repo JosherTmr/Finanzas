@@ -11,7 +11,7 @@ interface Props {
 }
 
 const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
-  const { userConfig, getMonthlyIncomeTransaction } = useFinance();
+  const { userConfig, getMonthlyIncomeTransaction, isGoogleAuth, schedulePayment } = useFinance();
 
   const [title, setTitle] = useState(initialData?.title || '');
   // This 'amount' state will now handle BOTH monthly amount and total debt amount
@@ -21,7 +21,7 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
   const [recurrence, setRecurrence] = useState<RecurrenceType>(initialData?.recurrence || 'one-time');
   const [startDate, setStartDate] = useState(initialData?.startDate || new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(initialData?.endDate || '');
-  
+
   // New fields for Smart Debt Mode
   const [totalDebtAmount, setTotalDebtAmount] = useState(initialData?.totalDebtAmount?.toString() || '');
   const [installmentsCount, setInstallmentsCount] = useState(initialData?.installmentsCount?.toString() || '');
@@ -29,6 +29,7 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isPaid, setIsPaid] = useState(false);
+  const [addToCalendar, setAddToCalendar] = useState(false);
 
   const isSmartDebtMode = useMemo(() => type === 'debt' && recurrence === 'monthly-range', [type, recurrence]);
 
@@ -53,7 +54,7 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
     return getWorkTimeMessage(parseFloat(amountToCompare), hourlyRate, userConfig.workHoursPerDay);
   }, [amount, totalDebtAmount, isSmartDebtMode, type, userConfig, getMonthlyIncomeTransaction]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: { [key: string]: string } = {};
 
@@ -109,6 +110,12 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
     };
 
     onSave(newTransaction, isPaid);
+
+    // Add to calendar if requested
+    if (addToCalendar && isGoogleAuth && schedulePayment) {
+      await schedulePayment(title, startDate, finalAmount);
+    }
+
     onClose();
   };
 
@@ -324,6 +331,22 @@ const TransactionForm: React.FC<Props> = ({ onClose, onSave, initialData }) => {
               <div className="flex flex-col">
                 <span className="text-sm font-bold text-textMain">¿Ya fue pagado?</span>
                 <span className="text-[10px] text-textMuted">Se marcará como completado inmediatamente.</span>
+              </div>
+            </div>
+          )}
+
+          {/* Add to Calendar - Only for debts and recurring expenses when Google is connected */}
+          {!initialData && isGoogleAuth && (type === 'debt' || (type === 'expense' && recurrence !== 'one-time')) && (
+            <div
+              className="flex items-center gap-3 bg-primary/5 p-3 rounded-xl border border-primary/10 cursor-pointer hover:bg-primary/10 transition-colors"
+              onClick={() => setAddToCalendar(!addToCalendar)}
+            >
+              <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${addToCalendar ? 'bg-primary border-primary' : 'border-primary/30'}`}>
+                {addToCalendar && <Check size={16} className="text-white" strokeWidth={3} />}
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-textMain">📅 Agregar recordatorio al Calendario</span>
+                <span className="text-[10px] text-textMuted">Se creará un evento en Google Calendar con notificaciones</span>
               </div>
             </div>
           )}

@@ -49,6 +49,13 @@ export interface UserConfig {
   locale: string;
 }
 
+export interface AppBackupData {
+  transactions: Transaction[];
+  userConfig: UserConfig;
+  statusMap: TransactionStatusMap;
+  lastUpdated: number;
+}
+
 export const CATEGORY_LABELS: Record<Category, string> = {
   housing: 'Vivienda',
   food: 'Alimentación',

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Transaction, TransactionStatusMap, MonthlySummary, UserConfig } from '../types';
+import { useGoogleCloud } from '../hooks/useGoogleCloud';
 
 interface FinanceContextType {
   transactions: Transaction[];
@@ -19,6 +20,9 @@ interface FinanceContextType {
   selectedMonth: number; // 0-11
   setSelectedMonth: (month: number) => void;
   getMonthlySummary: (year: number, month: number) => MonthlySummary;
+  loginGoogle: () => void;
+  isGoogleAuth: boolean;
+  schedulePayment: (title: string, date: string, amount: number) => Promise<void>;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -42,6 +46,15 @@ const INITIAL_CONFIG: UserConfig = {
 };
 
 export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // Google Cloud integration
+  const {
+    isAuthenticated,
+    handleLogin,
+    saveToDrive,
+    loadFromDrive,
+    addToCalendar
+  } = useGoogleCloud();
+
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('transactions');
     return saved ? JSON.parse(saved) : INITIAL_DATA;
@@ -60,6 +73,28 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
 
+  // Load data from Drive when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadFromDrive().then(data => {
+        if (data) {
+          const localLastUpdated = Number(localStorage.getItem('lastUpdated')) || 0;
+          // Use the most recent data (Drive vs localStorage)
+          if (data.lastUpdated > localLastUpdated) {
+            console.log('📥 Cargando datos desde Drive (más reciente)');
+            setTransactions(data.transactions);
+            setUserConfig(data.userConfig);
+            setStatusMap(data.statusMap);
+            localStorage.setItem('lastUpdated', data.lastUpdated.toString());
+          } else {
+            console.log('📱 Datos locales son más recientes');
+          }
+        }
+      });
+    }
+  }, [isAuthenticated, loadFromDrive]);
+
+  // Save to localStorage
   useEffect(() => {
     localStorage.setItem('transactions', JSON.stringify(transactions));
   }, [transactions]);
@@ -71,6 +106,23 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   useEffect(() => {
     localStorage.setItem('userConfig', JSON.stringify(userConfig));
   }, [userConfig]);
+
+  // Auto-save to Drive with debounce
+  useEffect(() => {
+    if (isAuthenticated) {
+      const timeout = setTimeout(() => {
+        const backupData = {
+          transactions,
+          userConfig,
+          statusMap,
+          lastUpdated: Date.now()
+        };
+        saveToDrive(backupData);
+        localStorage.setItem('lastUpdated', backupData.lastUpdated.toString());
+      }, 2000); // 2 second debounce
+      return () => clearTimeout(timeout);
+    }
+  }, [transactions, userConfig, statusMap, isAuthenticated, saveToDrive]);
 
   const addTransaction = (t: Transaction) => {
     setTransactions(prev => [...prev, t]);
@@ -281,7 +333,10 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       setSelectedYear,
       selectedMonth,
       setSelectedMonth,
-      getMonthlySummary
+      getMonthlySummary,
+      loginGoogle: handleLogin,
+      isGoogleAuth: isAuthenticated,
+      schedulePayment: addToCalendar
     }}>
       {children}
     </FinanceContext.Provider>
