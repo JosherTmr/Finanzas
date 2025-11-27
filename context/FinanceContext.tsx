@@ -24,6 +24,8 @@ interface FinanceContextType {
   loginGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   isGoogleAuth: boolean;
+  isTokenValid: boolean;
+  tokenError: string | null;
   authLoading: boolean;
   schedulePayment: (title: string, date: string, amount: number) => Promise<void>;
 }
@@ -54,6 +56,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     user,
     loading: authLoading,
     accessToken,
+    isTokenValid,
     loginWithGoogle,
     logout: firebaseLogout
   } = useFirebaseAuth();
@@ -61,10 +64,11 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Google Cloud integration (Drive & Calendar)
   const {
     isAuthenticated,
+    tokenError,
     saveToDrive,
     loadFromDrive,
     addToCalendar
-  } = useGoogleCloud({ accessToken });
+  } = useGoogleCloud({ accessToken, isTokenValid });
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('transactions');
@@ -348,6 +352,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       loginGoogle: loginWithGoogle,
       logout: firebaseLogout,
       isGoogleAuth: !!user,
+      isTokenValid,
+      tokenError,
       authLoading,
       schedulePayment: addToCalendar
     }}>

@@ -16,11 +16,13 @@ declare global {
 
 interface UseGoogleCloudProps {
     accessToken: string | null;
+    isTokenValid: boolean;
 }
 
-export const useGoogleCloud = ({ accessToken }: UseGoogleCloudProps) => {
+export const useGoogleCloud = ({ accessToken, isTokenValid }: UseGoogleCloudProps) => {
     const [isInitialized, setIsInitialized] = useState(false);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [tokenError, setTokenError] = useState<string | null>(null);
 
     // Initialize GAPI (Google API Client) - only needs API key, not auth
     useEffect(() => {
@@ -51,21 +53,34 @@ export const useGoogleCloud = ({ accessToken }: UseGoogleCloudProps) => {
 
     // Set access token in gapi when Firebase provides it
     useEffect(() => {
-        if (isInitialized && accessToken && window.gapi?.client) {
+        if (isInitialized && accessToken && isTokenValid && window.gapi?.client) {
             window.gapi.client.setToken({
                 access_token: accessToken
             });
             setIsAuthenticated(true);
+            setTokenError(null);
             console.log('✅ Access token set in GAPI');
-        } else if (!accessToken) {
+        } else {
+            // Clear authentication if no token or token is invalid
+            if (window.gapi?.client?.setToken) {
+                window.gapi.client.setToken(null);
+            }
             setIsAuthenticated(false);
+
+            if (accessToken && !isTokenValid) {
+                setTokenError('Token de Google expirado. Por favor, reconéctate.');
+                console.log('⚠️ Token inválido, se requiere reconexión');
+            }
         }
-    }, [isInitialized, accessToken]);
+    }, [isInitialized, accessToken, isTokenValid]);
 
     // --- DRIVE OPERATIONS ---
 
-    const saveToDrive = useCallback(async (data: AppBackupData) => {
-        if (!isAuthenticated || !window.gapi) return;
+    const saveToDrive = useCallback(async (data: AppBackupData): Promise<boolean> => {
+        if (!isAuthenticated || !window.gapi) {
+            console.log('⚠️ No autenticado o GAPI no disponible');
+            return false;
+        }
 
         try {
             // 1. Search for existing backup file
@@ -94,20 +109,37 @@ export const useGoogleCloud = ({ accessToken }: UseGoogleCloudProps) => {
                 form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
                 form.append('file', file);
 
-                await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
                     method: 'POST',
                     headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
                     body: form
                 });
+
+                if (!uploadResponse.ok) {
+                    throw new Error(`HTTP ${uploadResponse.status}: ${uploadResponse.statusText}`);
+                }
             }
             console.log('✅ Datos guardados en Drive');
-        } catch (error) {
+            return true;
+        } catch (error: any) {
             console.error('❌ Error guardando en Drive:', error);
+
+            // Check for authentication errors
+            if (error?.status === 401 || error?.status === 403 ||
+                error?.result?.error?.code === 401 || error?.result?.error?.code === 403) {
+                setTokenError('Token de autenticación inválido. Por favor, reconéctate.');
+                console.log('🔒 Error de autenticación detectado en saveToDrive');
+            }
+
+            return false;
         }
     }, [isAuthenticated]);
 
     const loadFromDrive = useCallback(async (): Promise<AppBackupData | null> => {
-        if (!isAuthenticated || !window.gapi) return null;
+        if (!isAuthenticated || !window.gapi) {
+            console.log('⚠️ No autenticado o GAPI no disponible');
+            return null;
+        }
 
         try {
             const response = await window.gapi.client.drive.files.list({
@@ -125,8 +157,15 @@ export const useGoogleCloud = ({ accessToken }: UseGoogleCloudProps) => {
                 console.log('✅ Datos cargados desde Drive');
                 return result.result as AppBackupData;
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('❌ Error cargando de Drive:', error);
+
+            // Check for authentication errors
+            if (error?.status === 401 || error?.status === 403 ||
+                error?.result?.error?.code === 401 || error?.result?.error?.code === 403) {
+                setTokenError('Token de autenticación inválido. Por favor, reconéctate.');
+                console.log('🔒 Error de autenticación detectado en loadFromDrive');
+            }
         }
         return null;
     }, [isAuthenticated]);
@@ -170,6 +209,7 @@ export const useGoogleCloud = ({ accessToken }: UseGoogleCloudProps) => {
     return {
         isInitialized,
         isAuthenticated,
+        tokenError,
         saveToDrive,
         loadFromDrive,
         addToCalendar
