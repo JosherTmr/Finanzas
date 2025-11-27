@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Transaction, TransactionStatusMap, MonthlySummary, UserConfig } from '../types';
 import { useGoogleCloud } from '../hooks/useGoogleCloud';
+import { useFirebaseAuth } from '../hooks/useFirebaseAuth';
 
 interface FinanceContextType {
   transactions: Transaction[];
@@ -20,8 +21,10 @@ interface FinanceContextType {
   selectedMonth: number; // 0-11
   setSelectedMonth: (month: number) => void;
   getMonthlySummary: (year: number, month: number) => MonthlySummary;
-  loginGoogle: () => void;
+  loginGoogle: () => Promise<void>;
+  logout: () => Promise<void>;
   isGoogleAuth: boolean;
+  authLoading: boolean;
   schedulePayment: (title: string, date: string, amount: number) => Promise<void>;
 }
 
@@ -46,14 +49,22 @@ const INITIAL_CONFIG: UserConfig = {
 };
 
 export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Google Cloud integration
+  // Firebase Authentication
+  const {
+    user,
+    loading: authLoading,
+    accessToken,
+    loginWithGoogle,
+    logout: firebaseLogout
+  } = useFirebaseAuth();
+
+  // Google Cloud integration (Drive & Calendar)
   const {
     isAuthenticated,
-    handleLogin,
     saveToDrive,
     loadFromDrive,
     addToCalendar
-  } = useGoogleCloud();
+  } = useGoogleCloud({ accessToken });
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('transactions');
@@ -334,8 +345,10 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       selectedMonth,
       setSelectedMonth,
       getMonthlySummary,
-      loginGoogle: handleLogin,
-      isGoogleAuth: isAuthenticated,
+      loginGoogle: loginWithGoogle,
+      logout: firebaseLogout,
+      isGoogleAuth: !!user,
+      authLoading,
       schedulePayment: addToCalendar
     }}>
       {children}

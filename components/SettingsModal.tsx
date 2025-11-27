@@ -8,7 +8,7 @@ interface Props {
 }
 
 const SettingsModal: React.FC<Props> = ({ onClose }) => {
-  const { userConfig, updateUserConfig, getMonthlyIncomeTransaction, updateMonthlyIncome, loginGoogle, isGoogleAuth } = useFinance();
+  const { userConfig, updateUserConfig, getMonthlyIncomeTransaction, updateMonthlyIncome, loginGoogle, logout, isGoogleAuth } = useFinance();
 
   // Get the actual monthly income from transactions
   const incomeTransaction = getMonthlyIncomeTransaction();
@@ -113,9 +113,22 @@ const SettingsModal: React.FC<Props> = ({ onClose }) => {
                 Conectar con Google
               </button>
             ) : (
-              <div className="bg-income/10 border border-income/30 rounded-xl p-3 flex items-center justify-center gap-2">
-                <div className="w-2 h-2 bg-income rounded-full animate-pulse"></div>
-                <span className="text-sm text-income font-medium">✓ Sincronizado con Google Drive</span>
+              <div className="space-y-2">
+                <div className="bg-income/10 border border-income/30 rounded-xl p-3 flex items-center justify-center gap-2">
+                  <div className="w-2 h-2 bg-income rounded-full animate-pulse"></div>
+                  <span className="text-sm text-income font-medium">✓ Sincronizado con Google Drive</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (window.confirm('¿Estás seguro de que deseas cerrar sesión? Perderás el acceso a la sincronización en la nube.')) {
+                      await logout();
+                    }
+                  }}
+                  className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-500 font-semibold py-2 px-4 rounded-xl border border-red-500/30 transition-all"
+                >
+                  Desconectar de Google
+                </button>
               </div>
             )}
             <p className="text-[10px] text-textMuted mt-1">

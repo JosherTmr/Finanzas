@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
 import { useFinance } from '../context/FinanceContext';
 import { useNavigate } from 'react-router-dom';
-import { Cloud, CheckCircle, Shield } from 'lucide-react';
+import { Cloud, CheckCircle, Shield, Loader2 } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
-    const { loginGoogle, isGoogleAuth } = useFinance();
+    const { loginGoogle, isGoogleAuth, authLoading } = useFinance();
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -12,6 +12,14 @@ const LoginPage: React.FC = () => {
             navigate('/');
         }
     }, [isGoogleAuth, navigate]);
+
+    const handleLogin = async () => {
+        try {
+            await loginGoogle();
+        } catch (error) {
+            console.error('Error en login:', error);
+        }
+    };
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
@@ -50,15 +58,25 @@ const LoginPage: React.FC = () => {
                     </div>
 
                     <button
-                        onClick={loginGoogle}
-                        className="w-full flex items-center justify-center gap-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200"
+                        onClick={handleLogin}
+                        disabled={authLoading}
+                        className="w-full flex items-center justify-center gap-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        <img
-                            src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                            alt="Google"
-                            className="w-5 h-5"
-                        />
-                        Continuar con Google
+                        {authLoading ? (
+                            <>
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                                Iniciando sesión...
+                            </>
+                        ) : (
+                            <>
+                                <img
+                                    src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                                    alt="Google"
+                                    className="w-5 h-5"
+                                />
+                                Continuar con Google
+                            </>
+                        )}
                     </button>
                 </div>
 

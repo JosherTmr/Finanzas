@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Transaction, UserConfig, TransactionStatusMap, AppBackupData } from '../types';
 
-const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
-const SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/calendar';
 const DISCOVERY_DOCS = [
     'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
     'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'
@@ -13,16 +11,18 @@ const DISCOVERY_DOCS = [
 declare global {
     interface Window {
         gapi: any;
-        google: any;
     }
 }
 
-export const useGoogleCloud = () => {
+interface UseGoogleCloudProps {
+    accessToken: string | null;
+}
+
+export const useGoogleCloud = ({ accessToken }: UseGoogleCloudProps) => {
     const [isInitialized, setIsInitialized] = useState(false);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [tokenClient, setTokenClient] = useState<any>(null);
 
-    // 1. Initialize GAPI (Google API Client)
+    // Initialize GAPI (Google API Client) - only needs API key, not auth
     useEffect(() => {
         const script = document.createElement('script');
         script.src = 'https://apis.google.com/js/api.js';
@@ -34,6 +34,7 @@ export const useGoogleCloud = () => {
                         discoveryDocs: DISCOVERY_DOCS,
                     });
                     setIsInitialized(true);
+                    console.log('✅ GAPI initialized');
                 } catch (error) {
                     console.error('Error initializing GAPI:', error);
                 }
@@ -41,35 +42,25 @@ export const useGoogleCloud = () => {
         };
         document.body.appendChild(script);
 
-        // Load Google Identity Services library
-        const scriptGIS = document.createElement('script');
-        scriptGIS.src = 'https://accounts.google.com/gsi/client';
-        scriptGIS.onload = () => {
-            const client = window.google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: SCOPES,
-                callback: (response: any) => {
-                    if (response.access_token) {
-                        setIsAuthenticated(true);
-                    }
-                },
-            });
-            setTokenClient(client);
-        };
-        document.body.appendChild(scriptGIS);
-
         return () => {
-            // Cleanup scripts on unmount
-            const scripts = document.querySelectorAll('script[src*="google"]');
+            // Cleanup script on unmount
+            const scripts = document.querySelectorAll('script[src*="googleapis"]');
             scripts.forEach(s => s.remove());
         };
     }, []);
 
-    const handleLogin = useCallback(() => {
-        if (tokenClient) {
-            tokenClient.requestAccessToken();
+    // Set access token in gapi when Firebase provides it
+    useEffect(() => {
+        if (isInitialized && accessToken && window.gapi?.client) {
+            window.gapi.client.setToken({
+                access_token: accessToken
+            });
+            setIsAuthenticated(true);
+            console.log('✅ Access token set in GAPI');
+        } else if (!accessToken) {
+            setIsAuthenticated(false);
         }
-    }, [tokenClient]);
+    }, [isInitialized, accessToken]);
 
     // --- DRIVE OPERATIONS ---
 
@@ -179,7 +170,6 @@ export const useGoogleCloud = () => {
     return {
         isInitialized,
         isAuthenticated,
-        handleLogin,
         saveToDrive,
         loadFromDrive,
         addToCalendar
